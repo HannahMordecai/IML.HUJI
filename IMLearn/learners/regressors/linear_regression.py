@@ -1,8 +1,13 @@
 from __future__ import annotations
 from typing import NoReturn
+
+from numpy import linalg
+
 from ...base import BaseEstimator
 import numpy as np
 from numpy.linalg import pinv
+
+from ...metrics import loss_functions
 
 
 class LinearRegression(BaseEstimator):
@@ -49,7 +54,18 @@ class LinearRegression(BaseEstimator):
         -----
         Fits model with or without an intercept depending on value of `self.include_intercept_`
         """
-        raise NotImplementedError()
+
+        if self.include_intercept_:
+            # X = np.c_[np.ones(X.shape[0]), X]
+            a = np.zeros((len(X), len(X[0]) + 1))
+            for i in range(len(X)):
+                a[i][0] = 1
+                for k in range(len(X[0])):
+                    a[i][k + 1] = X[i][k]
+        else:
+            a = X
+        psoude_inv = pinv(a.transpose()).transpose()
+        self.coefs_ = np.matmul(psoude_inv, y)
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -65,7 +81,10 @@ class LinearRegression(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        raise NotImplementedError()
+        if self.include_intercept_:
+            mat = np.c_[np.ones(self.coefs_.shape[0]), self.coefs_]
+            return np.matmul(X, mat) + self.coefs_[0]
+        return np.matmul(X, self.coefs_)
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -84,4 +103,4 @@ class LinearRegression(BaseEstimator):
         loss : float
             Performance under MSE loss function
         """
-        raise NotImplementedError()
+        return loss_functions.mean_square_error(y, self._predict(X))

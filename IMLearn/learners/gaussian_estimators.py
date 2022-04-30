@@ -1,4 +1,8 @@
 from __future__ import annotations
+
+import copy
+import math
+
 import numpy as np
 from numpy.linalg import inv, det, slogdet
 
@@ -7,6 +11,7 @@ class UnivariateGaussian:
     """
     Class for univariate Gaussian Distribution Estimator
     """
+
     def __init__(self, biased_var: bool = False) -> UnivariateGaussian:
         """
         Estimator for univariate Gaussian mean and variance parameters
@@ -30,6 +35,7 @@ class UnivariateGaussian:
             Estimated variance initialized as None. To be set in `UnivariateGaussian.fit`
             function.
         """
+        biased_var = True
         self.biased_ = biased_var
         self.fitted_, self.mu_, self.var_ = False, None, None
 
@@ -51,8 +57,13 @@ class UnivariateGaussian:
         Sets `self.mu_`, `self.var_` attributes according to calculated estimation (where
         estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
 
+        x_copy = copy.deepcopy(X)
+        len_x = len(X) - 1
+        self.mu_ = np.sum(X) / (len_x + 1)
+        x_copy = x_copy - self.mu_
+        x_copy = np.multiply(x_copy, x_copy)
+        self.var_ = np.sum(x_copy) / len_x
         self.fitted_ = True
         return self
 
@@ -76,7 +87,17 @@ class UnivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+
+        len_x = len(X)
+        ret_val = np.zeros(len_x)
+        x_copy = X - self.mu_
+        x_copy = x_copy ** 2
+        temp = self.var_ * (2)
+        x_copy = x_copy / (-1) * temp
+        lower = math.sqrt(temp * math.pi)
+        for i in range(len_x):
+            ret_val[i] = (math.e ** x_copy[i]) / lower
+        return ret_val
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
@@ -97,13 +118,22 @@ class UnivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
+        x_copy = copy.deepcopy(X)
+        len_x = len(X)
+        x_copy = x_copy - mu
+        x_copy = np.multiply(x_copy, x_copy)
+        temp = sigma * 2
+        y = np.sum(x_copy) / (-1) * temp
+        # ret_val = np.zeros(len_x)
+        lower = (math.sqrt(temp * math.pi)) ** len_x
+        return math.log(1 / lower) + y
 
 
 class MultivariateGaussian:
     """
     Class for multivariate Gaussian Distribution Estimator
     """
+
     def __init__(self):
         """
         Initialize an instance of multivariate Gaussian estimator
@@ -143,8 +173,8 @@ class MultivariateGaussian:
         Sets `self.mu_`, `self.cov_` attributes according to calculated estimation.
         Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
-
+        self.mu_ = X.mean(axis=0)
+        self.cov_ = np.cov(X, rowvar=False)
         self.fitted_ = True
         return self
 
@@ -168,7 +198,14 @@ class MultivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+        len_x = len(X)
+        ret_val = np.zeros(len_x)
+        lower = np.linalg.det(self.cov_) * math.pi * 2
+        for i in range(len_x):
+            temp = X[i] - self.mu_
+            upper = math.e ** (0.5 * (np.matmul(np.matmul(temp.transpose(), inv(self.cov_)), temp)))
+            ret_val[i] = upper / math.sqrt(lower * len(temp))
+        return ret_val
 
     @staticmethod
     def log_likelihood(mu: np.ndarray, cov: np.ndarray, X: np.ndarray) -> float:
@@ -189,4 +226,15 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
+
+        len_x = len(X)
+        ret_val = np.zeros(len_x)
+        det_val = np.linalg.det(cov)
+        for i in range(len_x):
+            temp = X[i] - mu
+            ret_val[i] = np.matmul(np.matmul(temp.transpose(), inv(cov)), temp) * 0.5
+        dim_x = len(X[0]) * len_x
+        first = math.log(math.pi * 2) * dim_x
+        first = 0 - first
+        second = math.log(det_val) * len_x
+        return first - (second * 0.5) - np.sum(ret_val)
